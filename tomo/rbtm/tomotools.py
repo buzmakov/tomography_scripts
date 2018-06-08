@@ -7,7 +7,11 @@ import numpy as np
 import pylab as plt
 import cv2
 import json
+import requests
+import time
 
+
+STORAGE_SERVER = "http://10.0.7.153:5006/"
 
 import sys
 
@@ -84,17 +88,39 @@ def get_experiment_hdf5(experiment_id, output_dir):
     data_file = os.path.join(output_dir, experiment_id + '.h5')
     logging.info('Output experiment HDF5 file: {}'.format(data_file))
     if not os.path.isfile(data_file):
-        hdf5_url = 'http://10.0.7.153:5006/storage/experiments/{}.h5'.format(
+        hdf5_url = STORAGE_SERVER + 'storage/experiments/{}.h5'.format(
             experiment_id)
         logging.info('Downloading file: {}'.format(hdf5_url))
-        try:
-            urlretrieve(hdf5_url, filename=data_file)
-        except Exception as e:
-            logging.warn("error downloading {}: {}".format(hdf5_url, e))
+        
+        remaining_download_tries = 5
+
+        while remaining_download_tries > 0 :
+            try:
+                urlretrieve(hdf5_url, filename=data_file)
+                logging.info('Successfully downloaded: {}'.format(hdf5_url))
+                time.sleep(0.1)
+            except Exception as e:
+                logging.warn("error downloading {}  on trial no {}: {}".format(hdf5_url, 6 - remaining_download_tries, e))
+                remaining_download_tries = remaining_download_tries - 1
+                continue
+            else:
+                break
+        # try:
+        #     urlretrieve(hdf5_url, filename=data_file)
+        # except Exception as e:
+        #     logging.warn("error downloading {}: {}".format(hdf5_url, e))
     else:
         logging.info('File exests. Use local copy')
 
     return data_file
+
+def get_tomoobject_info(experiment_id):
+    
+    exp_info = json.dumps(({"_id": experiment_id}))
+    experiment = requests.post(STORAGE_SERVER + 'storage/experiments/get',
+                               exp_info, timeout=1000)
+    experiment_info = json.loads(experiment.content)[0]
+    return  experiment_info
 
 
 def show_statistics(data_file):

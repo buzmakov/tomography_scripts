@@ -27,11 +27,17 @@ def grad_tv(img):
 
 def grad_fun(A, sino, D, x, Lambda):
     k = 1. / (D.mean()**2 * sino.size)
-    return k * (2.0 * (A.T * ((D * (A * x).reshape(sino.shape) - sino) * D)).reshape(x.shape) - Lambda * grad_tv(x))
+    res = 2.0 * (A.T * ((D * (A * x).reshape(sino.shape) - sino) * D)).reshape(x.shape)
+    if not np.isclose(Lambda,0):
+        res -= - Lambda * grad_tv(x)
+    return k * res
 
 def fun(A, sino, D, x, Lambda):
-    k = 1./sino.size
-    return k * (np.sum(((D * (A * x).reshape(sino.shape) - sino)) ** 2) + Lambda * tv(x))
+    k = 1./(D.mean()**2 *sino.size)
+    res = np.sum(((D * (A * x).reshape(sino.shape) - sino)) ** 2)
+    if not np.isclose(Lambda,0):
+        res += Lambda * tv(x)
+    return k * res
 
 def ternary_search(A, sino, D, x_0, grad, Lambda, left, right, eps=1e-3):
     while right - left > eps:
@@ -43,6 +49,7 @@ def ternary_search(A, sino, D, x_0, grad, Lambda, left, right, eps=1e-3):
             right = b
         else:
             left = a
+        print('{:.02}, {:.02}, {:.02}, {:.02}, {:.02}'.format(left, right, right - left ,(left + right) / 2, eps))
     return (left + right) / 2
 
 def Fletcher_Reeves(grad_f, grad_f_old):
@@ -61,8 +68,8 @@ def run(A, sino, x0, D=None, Lambda=0, eps=1e-10, n_it=100, step='CG', normalize
     radon_inv = sino.sum(axis=-1).mean()  #fix this 2 after sinogram correction
     max_v = sino.size
     
-    sino_d = sino.copy()
-    sino_d *= D
+    # sino_d = sino.copy()
+    sino_d = sino*D
 
     en_ar = []
     x_k_ar = []
@@ -70,26 +77,42 @@ def run(A, sino, x0, D=None, Lambda=0, eps=1e-10, n_it=100, step='CG', normalize
 
     x_k = x0.copy()
     grad_f = grad_fun(A, sino_d, D, x_k, Lambda)
+
     p_k = -np.copy(grad_f)
     grad_f_old = np.copy(grad_f)
     eng = 1.0
     eng_old = 2.0
     k = 0
-
+    right_serach = 2.
     while (np.abs(eng_old - eng) > eps) and (k < n_it):
+        print('Iteration:', k,'/', n_it) 
         if step == 'const':
             alpha = 1.0
         elif step == 'steepest':
-            alpha = ternary_search(A, sino_d, D, x_k, -grad_f, Lambda, 0.0, 10.0, eps=1e-3)
+            alpha = ternary_search(A, sino_d, D, x_k, -grad_f, Lambda, 0.0, 10.0, eps=1e-1)
         elif step == 'CG':
-            alpha = ternary_search(A, sino_d, D, x_k, p_k, Lambda, 0.0, 10.0, eps=1e-3)
+            alpha = ternary_search(A, sino_d, D, x_k, p_k, Lambda, 0.0, right_serach, eps=2e-1)
+            if alpha>=right_serach-2e-1:
+                right_serach *= 1.5
+            elif alpha < right_serach / 2.:
+                right_serach /= 1.5
         
         x_k = x_k + alpha * p_k
-        if normalize == True:
-            diff_radon = radon_inv/np.sum(x_k)
-            x_k *= (diff_radon-1)*0.7+1
+        
+        # if normalize == True:
+        #     x_k[x_k<0] = x_k[x_k<0]/2.
+            
         grad_f_old = np.copy(grad_f)
         grad_f = grad_fun(A, sino_d, D, x_k, Lambda)
+        
+        print('Gradient:{:.02} , {:.02}, {:.02}, {:.02}, {:.02}, {:.02}'.format(
+            np.sum(grad_f**2)**0.5/grad_f.size,
+            np.min(grad_f),
+            np.percentile(grad_f, 10),
+            np.percentile(grad_f, 50),
+            np.percentile(grad_f, 90),
+            np.max(grad_f))
+             )
         
         beta = 0.0
         if step == 'CG':
@@ -101,7 +124,7 @@ def run(A, sino, x0, D=None, Lambda=0, eps=1e-10, n_it=100, step='CG', normalize
         p_k = -grad_f + beta * p_k
 
         eng_old = np.copy(eng)
-        eng = np.sum(((A*x_k).reshape(sino.shape) - sino).ravel()**2) / max_v
+        eng = np.sum(((A*x_k).reshape(sino.shape) - sino).ravel()**2)**0.5 / max_v
         en_ar.append(eng)
         x_k_ar.append(x_k)
         al_ar.append(alpha)

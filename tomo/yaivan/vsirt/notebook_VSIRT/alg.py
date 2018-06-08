@@ -64,3 +64,20 @@ def gpu_sirt(pg, vg, rt, n_iters=100, x0=0.0):
     astra.data2d.delete(rt_id)
     astra.data2d.delete(v_id)
     return out
+
+def gpu_cgls(pg, vg, rt, n_iters=100, x0=0.0):
+    rt_id = astra.data2d.create('-sino', pg, data=rt)
+    v_id = astra.data2d.create('-vol', vg, x0)
+    sirt_cfg = astra.astra_dict('CGLS_CUDA')
+    sirt_cfg['ReconstructionDataId'] = v_id
+    sirt_cfg['ProjectionDataId'] = rt_id
+    #sirt_cfg['option'] = {}
+    #sirt_cfg['option']['MinConstraint'] = 0
+    sirt_id = astra.algorithm.create(sirt_cfg)
+    astra.algorithm.run(sirt_id, n_iters)
+    out = astra.data2d.get(v_id)
+
+    astra.algorithm.delete(sirt_id)
+    astra.data2d.delete(rt_id)
+    astra.data2d.delete(v_id)
+    return out
