@@ -1,0 +1,22 @@
+name: topo-tomo
+channels:
+  - conda-forge
+  - astra-toolbox/label/dev
+  - defaults
+dependencies:
+  - scipy
+  - py-opencv
+  - numpy
+  - matplotlib
+  - astra-toolbox
+  - h5py
+  - ipyvolume
+  - jupyter
+  - ipython
+  - nbformat
+  - python=3.7
+  - tqdm
+  - autopep8
+  - pylint
+  - jupytext
+  - pip

@@ -55,12 +55,16 @@ marker = ['o' if f else 'x' for f in flight]
 # %%
 for X in range(2, data.shape[1]):
     for Y in range(X+1, data.shape[1]):
+        plt.figure(figsize=(10,10))
+        labels = data.iloc[:,0]
         x = data.iloc[:,X]
         y = data.iloc[:,Y]
-        plt.figure(figsize=(8,8))
+        fig = plt.figure(figsize=(8,8))
 #         plt.scatter(x,y, c=colors, s=30*(length-min(length)*0.95), marker=marker)
         plt.scatter(x,y, c=colors, s=40*flight, marker='o', label='Летали')
         plt.scatter(x,y, c=colors, s=40*(1-flight), marker='x', label='Не летали')
+        for i in range(len(labels)):
+            plt.annotate(labels[i], (x[i],y[i]))
 #         red_patch = mpatches.Patch(marker='o', label='NOT flight')
 #         blue_patch = mpatches.Patch(marker='x', label='Flight')
 #         plt.legend(handles=[red_patch, blue_patch])

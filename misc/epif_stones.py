@@ -22,6 +22,7 @@ import numpy as np
 import h5py
 import pylab as plt
 from scipy import ndimage as ndi
+import pickle
 
 from scipy.ndimage.morphology import distance_transform_edt
 
@@ -36,7 +37,8 @@ data_files = [
     '/home/krivonosov/reconstruction/bc9b34a9-144d-4c2e-bd0d-3ba2f6358eff/bc9b34a9-144d-4c2e-bd0d-3ba2f6358eff.h5']
 
 # %%
-df = data_files[0]
+file_numb = 1
+df = data_files[file_numb]
 
 # %%
 data = h5py.File(df, 'r')['Reconstruction'].value
@@ -119,6 +121,9 @@ test_segmentation(data[400], markers_m[400])
 regions_m = regionprops(markers_m)
 print(len(regions_m))
 
+with open(f'e_{file_numb}.pkl','bw') as pf:
+    pickle.dump(regions_m, pf)
+
 # %%
 areas_m = [r.area for r in regions_m]
 x,y = np.histogram(areas_m, bins=10000)
@@ -152,8 +157,32 @@ def save_amira(in_array, out_path, reshape=3):
                          ' ] setLabel tomo.raw\n')
 
 
+# %%
+# save_amira(markers_m, '.', 1)
 
 # %%
-save_amira(markers_m, '.', 1)
+regs = []
+for f_numb_x in [0,1]:
+    with open(f'e_{f_numb_x}.pkl','rb') as pf:
+        print(f_numb_x)
+        regs.append(pickle.load(pf))
+
+# %%
+for i in [0,1]:
+    area = [np.power(3./4*r.area,1/3.) for r in regs[i] if r.area>3]
+    pos = [np.asarray([(r.bbox[0]+r.bbox[3])/2, (r.bbox[1]+r.bbox[4])/2, (r.bbox[2]+r.bbox[5])/2]) 
+           for r in regs[i] if r.area>3]
+    dists = []
+    for p0 in pos:
+        dists.append(np.min([np.linalg.norm(p0-p1) for p1 in pos if not np.linalg.norm(p0-p1)==0]))
+#     area = np.sort(area)[:-10]
+    print(f'sample#{i}:\n' +
+          f'\t number of inclusions: {len(area)}\n' +
+          f'\t radius:mean:{np.mean(area):.4} std:{np.std(area):.4}' +
+          f'25%:{np.percentile(area, 25):.4}  median:{np.median(area):.4} 75%:{np.percentile(area, 75):.4}\n'+
+          f'\t distance :mean:{np.mean(dists):.4} std:{np.std(dists):.4}'
+         )
+
+
 
 # %%

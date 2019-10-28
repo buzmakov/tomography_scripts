@@ -29,11 +29,21 @@ from scipy.ndimage.morphology import binary_closing, binary_fill_holes, binary_o
 from skimage.feature import peak_local_max
 from skimage.measure import regionprops
 from skimage.segmentation import watershed, random_walker
-
+from pathlib import Path
 import cv2
 
 # %%
-data = h5py.File('tomo_rec.h5')['Reconstruction'][150:,300:1000, 200:900]
+data_folderes = ['/diskmnt/b/makov/robotom/a47e0d1d-444c-4647-b9e1-5f0a3d7441b6',
+                '/diskmnt/b/makov/robotom/cd190221-f7c9-4509-a65e-039097920945']
+
+# %%
+df_number = 1
+df = Path(data_folderes[df_number])
+data = h5py.File(df / 'tomo_rec.h5')['Reconstruction']
+if df_number == 0 :
+    data = data[210:,300:1000, 200:900]
+elif df_number == 1 :
+    data = data[1850:2400, 400:1600, 400:1700]
 
 
 # %%
@@ -60,27 +70,37 @@ plt.show()
 # # !rm -rf images
 
 # %%
-# !mkdir images
+out_dir = Path('pores')/str(df_number)
+out_dir.mkdir(parents=True, exist_ok=True)
 
 # %%
 for i in tqdm_notebook(range(data.shape[0])):
-    plt.imsave(f'images/0_{i}.png',data[i], vmin=0.01, vmax=0.1, cmap=plt.cm.gray_r)
+    plt.imsave(out_dir / f'0_{i}.png',data[i], vmin=0.01, vmax=0.1, cmap=plt.cm.gray_r)
 
 for i in tqdm_notebook(range(data.shape[1])):
-    plt.imsave(f'images/1_{i}.png',data[:,i,:], vmin=0.01, vmax=0.1, cmap=plt.cm.gray_r)
+    plt.imsave(out_dir / f'1_{i}.png',data[:,i,:], vmin=0.01, vmax=0.1, cmap=plt.cm.gray_r)
 
 for i in tqdm_notebook(range(data.shape[2])):
-    plt.imsave(f'images/2_{i}.png',data[:,:,i], vmin=0.01, vmax=0.1, cmap=plt.cm.gray_r)
+    plt.imsave(out_dir / f'2_{i}.png',data[:,:,i], vmin=0.01, vmax=0.1, cmap=plt.cm.gray_r)
 
 # %%
-# !ffmpeg -y -r 10 -i "images/0_%d.png" -b:v 2000k poly_0.avi
-# !ffmpeg -y -r 10 -i "images/1_%d.png" -b:v 2000k poly_1.avi
-# !ffmpeg -y -r 10 -i "images/2_%d.png" -b:v 2000k poly_2.avi
+# !ffmpeg -y -r 10 -i "{out_dir}/0_%d.png" -b:v 2000k {out_dir}/poly_0.avi
+# !ffmpeg -y -r 10 -i "{out_dir}/1_%d.png" -b:v 2000k {out_dir}/poly_1.avi
+# !ffmpeg -y -r 10 -i "{out_dir}/2_%d.png" -b:v 2000k {out_dir}/poly_2.avi
 
 # %%
 for i in tqdm_notebook(range(data.shape[0])):
-    data[i] = cv2.medianBlur(np.asarray(data[i]>0.01, dtype='float32'), 7)
+    if df_number == 0:
+        thr = 0.01
+    elif df_number == 1:
+        thr = 0.05    
+    data[i] = cv2.medianBlur(np.asarray(data[i]>thr, dtype='float32'), 7)
 
+
+# %%
+# plt.figure(figsize=(12,12))
+# plt.imshow(cv2.medianBlur(np.asarray(data[300,:,:]>0.05, dtype='float32'), 7))
+# plt.show()
 
 # %%
 # x = data[200]
@@ -118,7 +138,7 @@ for i in range(70,350, 50):
      find_pores(data[i], True)   
 
 # %%
-pores = data[70:].copy()
+pores = data.copy()
 for i in tqdm_notebook(range(pores.shape[0])):
     pores[i] = find_pores(pores[i])
 
@@ -145,12 +165,12 @@ plt.colorbar(orientation='horizontal')
 plt.show()
 
 # %%
-# #https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_watershed.html#sphx-glr-auto-examples-segmentation-plot-watershed-py
-local_maxi = peak_local_max(pores_dtf, indices=False, 
-                            threshold_abs=2, min_distance=10,# footprint=np.ones((3, 3, 3)),
-                           labels=pores_t)# 
-markers, num_features = ndi.label(local_maxi)#, np.ones((3, 3, 3)))
-labels = watershed(-pores_dtf, markers, mask=pores_t)
+# # #https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_watershed.html#sphx-glr-auto-examples-segmentation-plot-watershed-py
+# local_maxi = peak_local_max(pores_dtf, indices=False, 
+#                             threshold_abs=2, min_distance=10,# footprint=np.ones((3, 3, 3)),
+#                            labels=pores_t)# 
+# markers, num_features = ndi.label(local_maxi)#, np.ones((3, 3, 3)))
+# labels = watershed(-pores_dtf, markers, mask=pores_t)
 
 # %%
 #https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_watershed.html#sphx-glr-auto-examples-segmentation-plot-watershed-py
@@ -160,46 +180,71 @@ labels = watershed(-pores_dtf, markers, mask=pores_t)
 # labels = watershed(pores_t, markers)
 
 # %%
+markers, num_features = ndi.label(pores_dtf>0, np.ones((3, 3, 3)))
 num_features
 
 # %%
-regions=regionprops(labels)
+import os
+def reshape_volume(volume, reshape):
+    res = np.zeros([s//reshape for s in volume.shape], dtype='float32')
+    xs,ys,zs = [s*reshape for s in res.shape]
+    for x,y,z in np.ndindex(reshape, reshape, reshape):
+        res += volume[x:xs:reshape, y:ys:reshape, z:zs:reshape]
+    return res/reshape**3
+
+def save_amira(in_array, out_path, reshape=3):
+    data_path = str(out_path)
+    with open(os.path.join(data_path, 'amira.raw'), 'wb') as amira_file:
+        reshaped_vol = reshape_volume(in_array, reshape)
+        reshaped_vol.tofile(amira_file)
+        file_shape = reshaped_vol.shape
+        with open(os.path.join(data_path, 'tomo.hx'), 'w') as af:
+                af.write('# Amira Script\n')
+                af.write('remove -all\n')
+                af.write(r'[ load -raw ${SCRIPTDIR}/amira.raw little xfastest float 1 '+
+                         str(file_shape[2])+' '+str(file_shape[1])+' '+str(file_shape[0])+
+                         ' 0 '+str(file_shape[2]-1)+' 0 '+str(file_shape[1]-1)+' 0 '+str(file_shape[0]-1)+
+                         ' ] setLabel tomo.raw\n')
+
 
 # %%
-print(regions[0].equivalent_diameter)
+save_amira(markers, out_dir, 1)
+
+# %%
+regions=regionprops(markers)
 
 # %%
 plt.figure(figsize=(15,15))
-plt.imshow(pores_dtf[51])
+plt.imshow(pores_dtf[50])
 # plt.colorbar(orientation='horizontal')
-plt.contour(markers[51])
+plt.contour(markers[50],colors='r')
 
 plt.show()
 
 # %%
 plt.figure(figsize=(15,15))
 plt.imshow(pores_t[50])
-plt.contour(labels[50], colors='r')#, vmin = np.percentile(labels[200].flat, 77))
+plt.contour(markers[50], colors='r')#, vmin = np.percentile(labels[200].flat, 77))
 # plt.colorbar(orientation='horizontal')
 plt.show()
 
 plt.figure(figsize=(15,15))
-plt.imshow(labels[50])
+plt.imshow(markers[50])
 # plt.colorbar(orientation='horizontal')
 plt.show()
 
 plt.figure(figsize=(15,15))
-plt.imshow(labels[:,200,:])
+plt.imshow(markers[:,200,:])
 # plt.colorbar(orientation='horizontal')
 plt.show()
 
 plt.figure(figsize=(15,15))
-plt.imshow(labels[:,:,200])
+plt.imshow(markers[:,:,200])
 # plt.colorbar(orientation='horizontal')
 plt.show()
 
 # %%
-vol = [r.area for r in regions]
+vol = [r.area for r in regions if r.area<1e7]
 # #volume of each pore
 # vol = np.zeros((num_features+1), dtype=int)
 # for x in tqdm_notebook(labels.flat):
