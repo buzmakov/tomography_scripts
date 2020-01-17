@@ -19,6 +19,7 @@
 #
 # * 2.1а (2019.09.20)
 #  - Improving poriosity support
+#  - ENH: 180 deg search
 # * 2.0d (2019.04.17-2019.05.06)
 #  - Adding dask support
 #  - Many code refactorings for semiautomatic runs
@@ -594,15 +595,17 @@ def find_axis_posiotion(image_0, image_180):
 
 # %%
 # seraching opposite frames (0 and 180 deg)
-def get_angles_at_180_deg(uniq_angles):  
-    for zero_angle in uniq_angles:
-        position_0 = np.argwhere(np.isclose(uniq_angles, zero_angle, atol=0.05))[0][0]
-        position_180 = np.argwhere(np.isclose(uniq_angles, 180+zero_angle, atol=0.05))
-        if len(position_180)>0:
-            position_180=position_180[0][0]
-            print(uniq_angles[position_0], position_0)
-            print(uniq_angles[position_180], position_180)
-            break
+def get_angles_at_180_deg(uniq_angles):
+    array_0 = np.asarray(uniq_angles)%360
+    cross_array = np.zeros((len(array_0),len(array_0)))
+    for i in range(1, len(array_0)):
+        cross_array[i] = np.roll(array_0, i)
+        
+    pos = np.argmin(np.abs(cross_array+180-array_0)%360)
+    print(pos)
+    position_180 = pos %len(array_0)
+    position_0 = (pos-position_180)//len(array_0)
+    print(position_0, position_180)
     return position_0, position_180
 
 position_0, position_180 = get_angles_at_180_deg(uniq_angles)
