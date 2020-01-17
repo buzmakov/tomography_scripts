@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.2'
-#       jupytext_version: 1.2.3
+#       jupytext_version: 1.2.4
 #   kernelspec:
 #     display_name: Python 3
 #     language: python
@@ -184,5 +184,16 @@ for i in [0,1]:
          )
 
 
+
+# %%
+for i in [0,1]:
+    area = [np.power(3./4*r.area,1/3.) for r in regs[i] if r.area>3]
+    print(f'sample#{i}:\n' +
+          f'\t number of inclusions: {len(area)}\n'+
+          f'\t number of big inclusions: {np.sum(np.asarray(area)>10)}\n'
+         )
+
+# %%
+plt.hist(area)
 
 # %%

@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.2'
-#       jupytext_version: 1.2.3
+#       jupytext_version: 1.2.4
 #   kernelspec:
 #     display_name: Python 3
 #     language: python
@@ -34,17 +34,25 @@ import cv2
 
 # %%
 data_folderes = ['/diskmnt/b/makov/robotom/a47e0d1d-444c-4647-b9e1-5f0a3d7441b6',
-                '/diskmnt/b/makov/robotom/cd190221-f7c9-4509-a65e-039097920945']
+                '/diskmnt/b/makov/robotom/cd190221-f7c9-4509-a65e-039097920945',
+                '/diskmnt/b/makov/robotom/02223e5a-1018-461d-baeb-471daa535d8f']
 
 # %%
-df_number = 1
+df_number = 2
 df = Path(data_folderes[df_number])
 data = h5py.File(df / 'tomo_rec.h5')['Reconstruction']
 if df_number == 0 :
     data = data[210:,300:1000, 200:900]
 elif df_number == 1 :
     data = data[1850:2400, 400:1600, 400:1700]
+elif df_number ==2:
+    data = data[1790:2320, 580:1300, 500:1260]
 
+
+# %%
+# plt.figure()
+# plt.imshow(data[1790:2320, 500:1300, data.shape[2]//2])
+# plt.show()
 
 # %%
 def create_mask(im):
