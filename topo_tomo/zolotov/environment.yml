@@ -4,17 +4,21 @@ channels:
   - astra-toolbox/label/dev
   - defaults
 dependencies:
-  - scipy
-  - py-opencv
+  - python=3.7
   - numpy
+  - scipy
+  - dask
   - matplotlib
   - astra-toolbox
+  - pyedflib
+  - opencv
+  - astropy
   - h5py
-  - ipyvolume
   - jupyter
   - ipython
   - nbformat
-  - python=3.7
+  - ipyvolume
+  - bokeh
   - tqdm
   - autopep8
   - pylint
